@@ -15,7 +15,7 @@ impl From<workload::config::Config> for DebugAgent {
 }
 
 impl Agent for DebugAgent {
-    fn prepare(&self) -> AgentResult<AgentOutput> {
+    fn prepare(&self) -> AgentResult<()> {
         let dir = format!("/tmp/{}", self.workload_config.workload_name);
 
         println!("Function directory: {}", dir);
@@ -32,14 +32,10 @@ impl Agent for DebugAgent {
         )
         .expect("Unable to write debug.txt file");
 
-        Ok(AgentOutput {
-            exit_code: 0,
-            stdout: "Build successfully!".into(),
-            stderr: String::default(),
-        })
+        Ok(())
     }
 
-    fn run(&self) -> AgentResult<AgentOutput> {
+    fn run(&self) -> AgentResult<()> {
         let dir = format!("/tmp/{}", self.workload_config.workload_name);
 
         let content = std::fs::read_to_string(format!("{}/debug.txt", &dir))
@@ -47,10 +43,6 @@ impl Agent for DebugAgent {
 
         std::fs::remove_dir_all(dir).expect("Unable to remove directory");
 
-        Ok(AgentOutput {
-            exit_code: 0,
-            stdout: content,
-            stderr: String::default(),
-        })
+        Ok(())
     }
 }

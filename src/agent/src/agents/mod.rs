@@ -13,8 +13,8 @@ pub struct AgentOutput {
 }
 
 pub trait Agent {
-    fn prepare(&self) -> AgentResult<AgentOutput>;
-    fn run(&self) -> AgentResult<AgentOutput>;
+    fn prepare(&self) -> AgentResult<()>;
+    fn run(&self) -> AgentResult<()>;
 }
 
 #[derive(Debug, Clone, Deserialize)]

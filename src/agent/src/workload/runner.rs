@@ -1,3 +1,5 @@
+use std::sync::mpsc;
+
 use crate::{
     agents::{rust, Agent, AgentOutput, Language},
     workload::config::Action,
@@ -14,32 +16,51 @@ use super::config::Config;
 pub struct Runner {
     config: Config,
     agent: Box<dyn Agent + Sync + Send>,
+    rx: mpsc::Receiver<String>,
 }
 
 impl Runner {
     pub fn new(config: Config) -> Self {
+        let (tx, rx) = mpsc::channel();
+
         let agent: Box<dyn Agent + Sync + Send> = match config.language {
-            Language::Rust => Box::new(rust::RustAgent::from(config.clone())),
+            Language::Rust => Box::new(rust::RustAgent::from(config.clone()).with_tx(tx)),
             #[cfg(feature = "debug-agent")]
             Language::Debug => Box::new(debug::DebugAgent::from(config.clone())),
         };
 
-        Runner { config, agent }
+        Self { config, agent, rx }
     }
 
-    pub fn run(&self) -> AgentResult<AgentOutput> {
+    pub fn run(&self) -> AgentResult<()> {
         let result = match self.config.action {
             Action::Prepare => self.agent.prepare()?,
             Action::Run => self.agent.run()?,
             Action::PrepareAndRun => {
                 let res = self.agent.prepare()?;
                 println!("Prepare result {:?}", res);
-                self.agent.run()?
+                self.agent.run()?;
+                println!("Run result {:?}", res);
             }
         };
 
-        println!("Result: {:?}", result);
+        loop {
+            match self.rx.try_recv() {
+                Ok(output) => {
+                    println!("runner: {:?}", output);
+                    println!("{}", output);
+                }
+                Err(e) => {
+                    // handle error
+                    println!("Error in receiving message: {}", e);
+                    break;
+                }
+            }
+        }
+        while let Ok(output) = self.rx.try_recv() {
+            println!("runner: {:?}", output);
+        }
 
-        Ok(result)
+        Ok(())
     }
 }

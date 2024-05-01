@@ -36,18 +36,7 @@ impl WorkloadRunner for WorkloadRunnerService {
         let res = runner
             .run()
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
-
-        let _ = tx
-            .send(Ok(ExecuteResponse {
-                stdout: res.stdout,
-                stderr: res.stderr,
-                exit_code: res.exit_code,
-            }))
-            .await
-            .map_err(|e| {
-                println!("Failed to send response: {:?}", e);
-                tonic::Status::internal("Failed to send response")
-            })?;
+        
 
         Ok(Response::new(ReceiverStream::new(rx)))
     }
