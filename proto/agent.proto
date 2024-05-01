@@ -5,18 +5,19 @@ import "google/protobuf/empty.proto";
 message ExecuteRequest {}
 
 message ExecuteResponse {
-  enum Stage {
-    PENDING = 0;
-    BUILDING = 1;
-    RUNNING = 2;
-    DONE = 3;
-    FAILED = 4;
-    DEBUG = 5;
-  }
-
-  string stdout = 1;
-  string stderr = 2;
-  int32 exit_code = 3;
+  // enum Stage {
+  //   PENDING = 0;
+  //   BUILDING = 1;
+  //   RUNNING = 2;
+  //   DONE = 3;
+  //   FAILED = 4;
+  //   DEBUG = 5;
+  // }
+  //
+  // string stdout = 1;
+  // string stderr = 2;
+  // int32 exit_code = 3;
+  string output = 1;
 }
 
 message SignalRequest {

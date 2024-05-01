@@ -1,3 +1,5 @@
+use tokio::sync::mpsc::Receiver;
+
 use crate::AgentResult;
 use serde::Deserialize;
 
@@ -13,8 +15,8 @@ pub struct AgentOutput {
 }
 
 pub trait Agent {
-    fn prepare(&self) -> AgentResult<()>;
-    fn run(&self) -> AgentResult<()>;
+    fn prepare(&self) -> AgentResult<Receiver<String>>;
+    fn run(&self) -> AgentResult<Receiver<String>>;
 }
 
 #[derive(Debug, Clone, Deserialize)]

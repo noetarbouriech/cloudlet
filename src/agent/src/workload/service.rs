@@ -2,7 +2,7 @@ use super::runner::Runner;
 use crate::agent::{self, ExecuteRequest, ExecuteResponse, SignalRequest};
 use agent::workload_runner_server::WorkloadRunner;
 use std::{process, sync::Arc};
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc, Mutex};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response};
 
@@ -25,18 +25,23 @@ impl WorkloadRunner for WorkloadRunnerService {
     type ExecuteStream = ReceiverStream<std::result::Result<ExecuteResponse, tonic::Status>>;
 
     async fn execute(&self, _: Request<ExecuteRequest>) -> Result<Self::ExecuteStream> {
-        let (tx, rx) = tokio::sync::mpsc::channel(4);
-
         // We assume there's only one request at a time
         let runner = self
             .runner
             .try_lock()
             .map_err(|e| tonic::Status::unavailable(format!("Runner is busy: {:?}", e)))?;
 
-        let res = runner
+        let mut run_rx = runner
             .run()
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
-        
+
+        let (tx, rx) = mpsc::channel(4);
+        tokio::spawn(async move {
+            while let Some(output) = run_rx.recv().await {
+                println!("Sending to the gRPC client: {}", output);
+                let _ = tx.send(Ok(ExecuteResponse { output })).await;
+            }
+        });
 
         Ok(Response::new(ReceiverStream::new(rx)))
     }

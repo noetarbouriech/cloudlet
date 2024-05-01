@@ -2,7 +2,12 @@ use super::{Agent, AgentOutput};
 use crate::{workload, AgentError, AgentResult};
 use rand::distributions::{Alphanumeric, DistString};
 use serde::Deserialize;
-use std::{fs::create_dir_all, io::{BufRead, BufReader}, process::{Command, Stdio}, sync::{mpsc, Arc, Mutex}};
+use std::{
+    fs::create_dir_all,
+    io::{BufRead, BufReader},
+    process::{Command, Stdio},
+};
+use tokio::sync::mpsc::{self, Receiver};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -19,15 +24,9 @@ struct RustAgentConfig {
 pub struct RustAgent {
     workload_config: workload::config::Config,
     rust_config: RustAgentConfig,
-    tx: Arc<Mutex<mpsc::Sender<String>>>,
 }
 
 impl RustAgent {
-    pub fn with_tx(mut self, tx: mpsc::Sender<String>) -> Self {
-        self.tx = Arc::new(tx.into());
-        self
-    }
-
     fn build(&self, function_dir: &String) -> AgentResult<AgentOutput> {
         if self.rust_config.build.release {
             let output = Command::new("cargo")
@@ -63,18 +62,15 @@ impl From<workload::config::Config> for RustAgent {
     fn from(workload_config: workload::config::Config) -> Self {
         let rust_config: RustAgentConfig = toml::from_str(&workload_config.config_string).unwrap();
 
-        let (tx, _rx) = mpsc::channel();
         Self {
             workload_config,
             rust_config,
-            tx: Arc::new(Mutex::new(tx))
-
         }
     }
 }
 
 impl Agent for RustAgent {
-    fn prepare(&self) -> AgentResult<()> {
+    fn prepare(&self) -> AgentResult<Receiver<String>> {
         let code = std::fs::read_to_string(&self.rust_config.build.source_code_path).unwrap();
 
         let function_dir = format!(
@@ -133,28 +129,29 @@ impl Agent for RustAgent {
 
         std::fs::remove_dir_all(&function_dir).expect("Unable to remove directory");
 
-        Ok(())
+        let (_tx, rx) = mpsc::channel(1);
+        Ok(rx)
     }
 
-    fn run(&self) -> AgentResult<()> {
+    fn run(&self) -> AgentResult<Receiver<String>> {
         let mut child = Command::new(format!("/tmp/{}", self.workload_config.workload_name))
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .spawn().unwrap();
+            .spawn()
+            .unwrap();
 
-        let tx = self.tx.clone();
+        let (tx, rx) = mpsc::channel(4);
         tokio::spawn(async move {
             let stdout = child.stdout.as_mut().unwrap();
             let stdout_reader = BufReader::new(stdout);
             let stdout_lines = stdout_reader.lines();
-            let tx = tx.lock().unwrap();
+
             for line in stdout_lines {
-                println!("rustagent: {:?}", line);
-                let _ = tx.send(line.unwrap());
+                println!("Got line from stdout: {:?}", line);
+                let _ = tx.send(line.unwrap()).await;
             }
         });
 
-        Ok(())
-
+        Ok(rx)
     }
 }
