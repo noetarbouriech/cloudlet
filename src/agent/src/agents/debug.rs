@@ -3,6 +3,7 @@ use crate::agents::Agent;
 use crate::{workload, AgentResult};
 use std::fs::create_dir_all;
 use std::time::SystemTime;
+use tokio::sync::mpsc::{self, Receiver};
 
 pub struct DebugAgent {
     workload_config: workload::config::Config,
@@ -15,7 +16,7 @@ impl From<workload::config::Config> for DebugAgent {
 }
 
 impl Agent for DebugAgent {
-    fn prepare(&self) -> AgentResult<()> {
+    fn prepare(&self) -> AgentResult<Receiver<String>> {
         let dir = format!("/tmp/{}", self.workload_config.workload_name);
 
         println!("Function directory: {}", dir);
@@ -32,10 +33,11 @@ impl Agent for DebugAgent {
         )
         .expect("Unable to write debug.txt file");
 
-        Ok(())
+        let (_tx, rx) = mpsc::channel(1);
+        Ok(rx)
     }
 
-    fn run(&self) -> AgentResult<()> {
+    fn run(&self) -> AgentResult<Receiver<String>> {
         let dir = format!("/tmp/{}", self.workload_config.workload_name);
 
         let content = std::fs::read_to_string(format!("{}/debug.txt", &dir))
@@ -43,6 +45,7 @@ impl Agent for DebugAgent {
 
         std::fs::remove_dir_all(dir).expect("Unable to remove directory");
 
-        Ok(())
+        let (_tx, rx) = mpsc::channel(1);
+        Ok(rx)
     }
 }

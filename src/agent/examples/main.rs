@@ -1,5 +1,3 @@
-use std::os::unix::thread;
-
 fn fibonacci(n: u32) -> u64 {
     match n {
         0 => 0,
@@ -20,9 +18,8 @@ fn fibonacci(n: u32) -> u64 {
 fn main() {
     let n = 10;
     println!("Fibonacci number at position {} is: {}", n, fibonacci(n));
-    // print caca 10 times
     for _ in 0..10 {
-        println!("test println");
+        println!("test print");
         std::thread::sleep(std::time::Duration::from_millis(1000));
     }
 }

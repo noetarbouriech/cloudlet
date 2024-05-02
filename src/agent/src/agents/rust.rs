@@ -104,7 +104,7 @@ impl Agent for RustAgent {
             println!("Build failed: {:?}", result);
             return Err(AgentError::BuildFailed(AgentOutput {
                 exit_code: result.exit_code,
-                stdout: result.stdout,
+                stdout: result.stderr.clone(),
                 stderr: result.stderr,
             }));
         }
@@ -129,7 +129,14 @@ impl Agent for RustAgent {
 
         std::fs::remove_dir_all(&function_dir).expect("Unable to remove directory");
 
-        let (_tx, rx) = mpsc::channel(1);
+        let (tx, rx) = mpsc::channel(1);
+        tokio::spawn(async move {
+            for line in result.stderr.lines() {
+                println!("Got line from build: {:?}", line);
+                let caca = tx.send(line.to_string()).await;
+                println!("err result: {:?}", caca.unwrap_err().0);
+            }
+        });
         Ok(rx)
     }
 
@@ -140,7 +147,7 @@ impl Agent for RustAgent {
             .spawn()
             .unwrap();
 
-        let (tx, rx) = mpsc::channel(4);
+        let (tx, rx) = mpsc::channel(1);
         tokio::spawn(async move {
             let stdout = child.stdout.as_mut().unwrap();
             let stdout_reader = BufReader::new(stdout);

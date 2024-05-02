@@ -35,7 +35,7 @@ impl WorkloadRunner for WorkloadRunnerService {
             .run()
             .map_err(|e| tonic::Status::internal(e.to_string()))?;
 
-        let (tx, rx) = mpsc::channel(4);
+        let (tx, rx) = mpsc::channel(1);
         tokio::spawn(async move {
             while let Some(output) = run_rx.recv().await {
                 println!("Sending to the gRPC client: {}", output);
